@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Netwok D3</title>
+    </head>
+    <body>
+        <svg></svg>
+        
+        <script src="https://d3js.org/d3.v4.min.js"></script>
+        <script>
+            // creating SVG canvas for drawing
+            window.onload = function(){
+                var svgCanvas = d3.select("svg")
+                    .attr("width", 1000)
+                    .attr("height", 500)
+                    .attr("class", "svgCanvas");
+            // using d3.json to load our data
+            d3.json("data.json", function(json){
+                console.log(json)
+                // creating empty dictionary for populating it with location and amounts
+                var locAmountdict = {}
+                var nodeobjectList = [];
+
+        // populating dictionary with the sites and corresponding amounts 
+                for(var i = 0; i<json.links.length;i++){
+                    // selecting the nodes
+                    var node1=json.links[i].node01
+                    var node2=json.links[i].node02
+                    // selecting the amount
+                    var amount=json.links[i].amount
+                    var node1amount = amount
+                    var node1conn = 1
+                    var node2amount = amount
+                    var node2conn = 1
+                    
+                    if (node1 in locAmountdict) {
+                        node1amount = locAmountdict[node1][0] + amount
+                        node1conn = locAmountdict[node1][1] + node1conn
+                    }
+                    if (node2 in locAmountdict) {
+                        node2amount = locAmountdict[node2][0] + amount
+                        node2conn = locAmountdict[node2][1] + node2conn
+                    } 
+                    // actuasl populating of the dictionary
+                    locAmountdict[node1] = [node1amount, node1conn]
+                    locAmountdict[node2] = [node2amount, node2conn]
+                }
+
+                //populating list of node objects
+                for(i = 0; i<json.nodes.length;i++){
+                    // selecting the id under nodes
+                    var loc = json.nodes[i].id
+                    // selecting the x and y amount under nodes
+                    var x = json.nodes[i].x
+                    var y = json.nodes[i].y
+                    // creating an empty set of node
+                    var node = {}
+                    node['loc'] = loc
+                    node['x'] = x
+                    node['y'] = y
+                    node['amount'] = locAmountdict[loc][0]
+                    // appending the location and amount to the empty list created at the beginning
+                    nodeobjectList.push(node)
+                }
+
+
+                // Trading factor to decide width of stroke. 
+                // Stroke width = trading amount / widthfactor
+                var widthfactor = 300
+
+                // plotting each connection on the canvas
+                for(i = 0; i<json.links.length; i++){
+                    // similarly extracting the location and amount done previously
+                    node1=json.links[i].node01
+                    node2=json.links[i].node02
+                    amount=json.links[i].amount
+                    
+                    // empty variables to store the x and y value of each nodes
+                    var x1,y1,x2,y2=0
+                    var foundnode1,foundnode2 = false
+                    for(var j = 0; j < nodeobjectList.length; j++) {
+                        // from the nodeobjectList, iterating over the locations
+                        var entry = nodeobjectList[j]
+                        // node1
+                        if(entry.loc==node1) {
+                            x1 = entry.x
+                            y1 = entry.y
+                            foundnode1=true
+                        }
+                        //node2
+                        if(entry.loc==node2) {
+                            x2 = entry.x
+                            y2 = entry.y
+                            foundnode2=true
+                        }
+                    }
+                    // appending the links between the nodes
+                    svgCanvas/*.data(json.links).enter()*/.append("line")
+                        .attr("class", node1 + ' ' + node2)
+                        .attr("x1", x1)
+                        .attr("y1", y1)
+                        .attr("x2", x2)
+                        .attr("y2", y2)
+                        // using the amount/widthfactor to measure the thickness of the link
+                        .attr("stroke-width", amount/widthfactor)
+                        .attr("stroke", "black");
+                }
+
+                // Trading factor to decide radius. 
+                // Radius = Total trading / radiusfactor
+                var radiusfactor = 10
+                function getRadius(loc) {
+                    // Total trading / radiusfactor
+                    return locAmountdict[loc][0]/radiusfactor
+                }
+                
+                // to show the information of a node when hovered upon
+                function getToolTipInfo(loc) {
+                    return loc + "\nTotal trading: " + locAmountdict[loc][0] + "\nNumber of connections: " + locAmountdict[loc][1]
+                }
+
+                // plotting each circle on the canvas
+                svgCanvas.selectAll("circle")
+                    .data(json.nodes).enter().append("circle")
+                    // centre of the circle from x and y value
+                    .attr("cx", function(node) {return node.x;})
+                    .attr("cy", function(node) {return node.y;})
+                    // radius of the circle from the getRadius function
+                    .attr("r",function(node) {return getRadius(node.id)})
+                    .attr("fill", "GRAY")
+                    // two parts:
+                    // 1) when mouse is hovered upon a node
+                    .on("mouseover", function(node){
+                        svgCanvas.selectAll("circle")
+                            .attr("opacity", 0.5); // grey out all circles
+                        svgCanvas.selectAll("line")
+                            .attr("opacity", 0.3); // grey out all lines
+                        svgCanvas.selectAll("."+node.id)
+                            .attr("opacity", 1.0);
+                        d3.select(this) // hightlight when on hovering on
+                            .attr("opacity", 1);
+                    })
+                    // 2) when mouse is pointed away
+                    .on("mouseout", function(thisElement, index){
+                        svgCanvas.selectAll("line")
+                            // grey out all lines
+                            .attr("opacity", 1); 
+                        svgCanvas.selectAll("circle")
+                            // grey out all lines
+                            .attr("opacity", 0.5); 
+                    })
+                    // showing the information of the node (or the circle)
+                    .append("title").text(function(node) {
+                        return getToolTipInfo(node.id)});
+                });
+            }
+        </script>
+    </body>
+</html>
